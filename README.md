@@ -52,7 +52,7 @@ Given a base model ($\mathcal{M}_{base}$), task instruction ($\mathcal{I}$), and
 
 ## Get started
 
-### 1. Create a virtual environment
+### 1. Create and activate a virtual environment
 
 ```bash
 conda create -n data_rl python=3.10
@@ -62,7 +62,7 @@ conda activate data_rl
 ### 2. Install related libraries.
 
 ```bash
-pip install -r requirements.txt
+sh activate.sh
 ```
 ### 3. Put your OpenAI Key
 
