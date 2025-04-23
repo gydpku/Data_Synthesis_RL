@@ -163,32 +163,6 @@ To guide the Reinforcement Learning (RL) process for your task, you need to crea
     * **Result Score:** Whether the final answer is correct.
 3.  **Register the Function:** Modify the `verl/trainer/main_ppo.py` script. Specifically, import it at line 20 and update the `_select_rm_score_fn` function  to map your task's identifier (passed via the `data_source` argument) to your newly created reward function. This ensures the PPO trainer uses the correct scoring logic for your task.
 
-Okay, here are polished versions for sections 6 and 7.
-
-Polished Section 6:
-
-Markdown
-
-### 6. Prepare Passage Libraries for Retrieval
-
-The retriever component requires access to text corpora (passage libraries). You need to place these within the `src/retriever/passages/` directory.
-
-**Using Standard Corpora (Example: CRAFT):**
-
-1.  **Download:** Obtain corpus files, for example, the Wikipedia, Wikihow, and StackExchange archives (`.tar.gz`) recommended in Step 0 of the CRAFT repository: [https://github.com/ziegler-ingo/CRAFT](https://github.com/ziegler-ingo/CRAFT).
-2.  **Extract:** Unzip the downloaded archives directly into the `src/retriever/passages/` directory.
-3.  **Rename (if necessary):** Ensure the resulting directories containing the corpus data are named appropriately. For the CRAFT examples, the expected structure would be:
-    * `src/retriever/passages/wiki/`
-    * `src/retriever/passages/wikihow/`
-    * `src/retriever/passages/stackexchange/`
-
-**Using Custom Corpora:**
-
-* You can add your own text libraries to the `src/retriever/passages/` directory.
-* Custom libraries must be in the **`.jsonl`** format (JSON Lines).
-* Each line in the `.jsonl` file must be a valid JSON object (dictionary) containing at least a `'text'` key, where the value is the passage content string.
-    * *Example line:* `{"text": "This is the content of a single passage."}`
-
 ### 6. Prepare Passage Libraries for Retrieval
 
 The retriever component requires access to text corpora (passage libraries). You need to place these within the `src/retriever/passages/` directory.
@@ -224,151 +198,48 @@ You can set a specific input/output example for demonstration or quick testing p
           # {'input': 'Another input', 'output': 'Another output'}
         ]
         ```
+### 8. Running an Experiment
+
+To execute an experiment, use the `src/main.py` script. You can specify the target GPUs using the `CUDA_VISIBLE_DEVICES` environment variable and configure the experiment using the following command-line arguments:
+
+* `--base_model_path`: Specifies the file path to the foundational language model directory (e.g., `./src/model/Qwen2.5-7B`).
+* `--task_name`: Identifies the specific task being run (e.g., `logiqa`).
+* `--task_instruction`: Provides the textual prompt defining the task objective for the model (e.g., `'You should answer logical reasoning questions accurately based on the provided context.'`).
+* `--dataset_path`: Points to the directory containing the dataset for this task (e.g., `'./src/data_logqa'`).
+* `--work_model_paths`: Specifies the file path to the specific model checkpoint(s) being used or evaluated in this run (e.g., `'./TinyZero/checkpoints/TinyZero'`).
+
+**Example Command:**
 
 
-
-
-
-
-
-
-
-
-
-
-### Running the examples
-
-
-
-To deploy our agent, you can run this:
-
-
+This example runs the `gsm8k` task on GPUs 0 through 4.
 
 ```bash
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4
 
-cd src
-
-python run.py --experiment_name <experiment_name> \
-
-              --target_model_path <target_model_path> \
-
-              --model <model_name> \
-
-              --base_model_path <base_model_path> \
-
-              --task_name <task_name> \
-
-              --task_instruction <task_instruction>
-
+# Execute the script
+python src/main.py \
+  --base_model_path ./src/model/Qwen2.5-7B \
+  --task_name gsm8k \
+  --task_instruction 'You are given a word problem involving basic arithmetic, algebra, or geometry. Your task is to carefully read the problem and provide a step-by-step solution for it' \
+  --dataset_path './src/data_gsm8k' \
+  --work_model_paths './TinyZero/checkpoints/TinyZero'
 ```
 
-Arguments
+This example runs the `logiqa` task on GPUs 0 through 4.
 
-```--experiment_name``` (str): Name of the experiment.
+```bash
+# Set target GPUs (e.g., GPUs 0, 1, 2, 3, 4)
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4
 
-
-
-```--target_model_path``` (str): Directory where the trained model will be saved.
-
-
-
-```--model (str)```: Name of the model (e.g., "Llama-3.1-8B-Instruct").
-
-
-
-```--base_model_path``` (str): Path to the initial pre-trained model.
-
-
-
-```--task_name``` (str): Name of the task being performed.
-
-
-
-```--task_instruction``` (str): Instruction for the task.
-
-
-
-For a example:
-
+# Run the experiment script
+python src/main.py \
+    --base_model_path ./src/model/Qwen2.5-7B \
+    --task_name logiqa \
+    --task_instruction 'You should answer logical reasoning questions accurately based on the provided context.' \
+    --dataset_path './src/data_logqa' \
+    --work_model_paths './TinyZero/checkpoints/TinyZero'
 ```
 
-python src/run.py --experiment_name "exp1" \
-
-              --target_model_path "./checkpoints/exp1" \
-
-              --model "LLaMa-3.1-8B-Instruct" \
-
-              --base_model_path "./models/llama-3.1-8B-instruct" \
-
-              --task_name "MedNLI" \
-
-              --task_instruction "The domain is Medical. The TASK: Please classify the relationship between the given premise and hypothesis into one of the following labels: entailment, contradiction, or neutral."
-
-```
-
-To train and test on your task, follow these two steps:
-
-
-
-1. Store your training and test data in the following format using the Hugging Face dataset:
-
-
-
-```
-
-from datasets import Dataset, DatasetDict
-
-
-
-# Step 1: Define your training and test data
-
-train_data = [
-
-    {"Input": "Example input 1", "Output": "Example output 1"},
-
-    {"Input": "Example input 2", "Output": "Example output 2"},
-
-]
-
-
-
-test_data = [
-
-    {"Input": "Test input 1", "Output": "Test output 1"},
-
-    {"Input": "Test input 2", "Output": "Test output 2"},
-
-]
-
-
-
-# Step 2: Convert to Hugging Face datasets
-
-train_dataset = Dataset.from_list(train_data)
-
-test_dataset = Dataset.from_list(test_data)
-
-
-
-# Step 3: Store datasets in a DatasetDict
-
-dataset = DatasetDict({"train": train_dataset, "test": test_dataset})
-
-
-
-# Step 4: Save the dataset (e.g., to disk)
-
-dataset.save_to_disk("task_dataset_path")
-
-```
-
-## Citation
-
-
+### Citation
 
 Please consider citing our paper if you find this approach useful.
-
-
-
-Specify the dataset path using ```--dataset_path``` and define the task's domain or topic with ```--domain```. 
-
