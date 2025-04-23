@@ -570,21 +570,12 @@ if __name__ == "__main__":
     parser.add_argument('--multi_task', type=bool, default=False,
                         help='multi_task_setting (default: False)')
     args = parser.parse_args()
-#    args.demo_examples = "{'input': 'TASK: Please classify the relationship between the given premise and hypothesis into one of the following labels: entailment, contradiction, or neutral. Return only the label.Input: Premise: Labs were notable for Cr 1.7 (baseline 0.5 per old records) and lactate 2.4. Hypothesis:  Patient has elevated Cr', 'output': 'entailment'}"
-#    args.demo_examples = '[{"input":"Context:Some Cantonese don\'t like chili, so some southerners don\'t like chili. Which of the following can guarantee the above argument? Option A:Some Cantonese love chili. Option B: Some people who like peppers are southerners. Option C: All Cantonese are southerners. Option D: Some Cantonese like neither peppers nor sweets.","output":"C"}]'
-#    args.demo_examples='[{"input":"Context:Some Cantonese don't like chili, so some southerners don't like chili.Which of the following can guarantee the above argument? Option A:Some Cantonese love chili. Option B: Some people who like peppers are southerners. Option C: All Cantonese are southerners. Option D: Some Cantonese like neither peppers nor sweets.","output":"C"}]'
     if 'gsm8k' in args.task_name:
         args.demo_examples='[{"input":"Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May?","output":"Natalia sold 48/2 = <<48/2=24>>24 clips in May. Natalia sold 48+24 = <<48+24=72>>72 clips altogether in April and May. #### 72"}]'
     if 'logiqa' in args.task_name:
         args.demo_examples = '[{"input":"Context:Some Cantonese don\'t like chili, so some southerners don\'t like chili. Which of the following can guarantee the above argument? Option A:Some Cantonese love chili. Option B: Some people who like peppers are southerners. Option C: All Cantonese are southerners. Option D: Some Cantonese like neither peppers nor sweets.","output":"C"}]'
 
         
-#    pdb.set_trace()
-    #args.demo_examples=[{"input":"Let \[f(x) = \left\{\begin{array}{cl} ax+3, &\text{ if }x>2, \\x-5 &\text{ if } -2 \le x \le 2, \\2x-b &\text{  if } x <-2.\end{array}\right.\]Find $a+b$ if the piecewise function is continuous (which means that its graph can be drawn without lifting your pencil from the paper).","output":"For the piecewise function to be continuous, the cases must "meet" at $2$ and $-2$. For example, $ax+3$ and $x-5$ must be equal when $x=2$. This implies $a(2)+3=2-5$, which we solve to get $2a=-6 \Rightarrow a=-3$. Similarly, $x-5$ and $2x-b$ must be equal when $x=-2$. Substituting, we get $-2-5=2(-2)-b$, which implies $b=3$. So $a+b=-3+3=\boxed{0}$."}]
-    
-    
-    #args.domain=["algebra","intermediate_algebra","prealgebra","geometry","number_theory","counting_and_probability","precaculus"]
-    #if '[' in args.domain:args.domain=eval(args.domain)
     if 'math' in args.task_name:
         import datasets
         for name in args.domain: #['Algebra','Intermediatealgebra','Pre-algebra','geometry','number theory', 'counting and probability','precaculus']: #['algebra', 'counting_and_probability', 'geometry', 'intermediate_algebra', 'number_theory', 'prealgebra', 'precalculus']:
@@ -592,11 +583,7 @@ if __name__ == "__main__":
             data = dataset['train'][0]
             new_data={'input':data['problem'],'output':data['solution']} 
             args.demo_examples.append([new_data])
-#    if '[' in args.task_instruction:args.task_instruction=eval(args.task_instruction)    
-    #args.demo_examples=[{"input":"Let \\[f(x) = \\left\\{\\begin{array}{cl} ax+3, &\\text{ if }x>2, \\\\x-5 &\\text{ if } -2 \\le x \\le 2, \\\\2x-b &\\text{\\ if } x <-2.\\end{array}\\right.\\]Find $a+b$ if the piecewise function is continuous (which means that its graph can be drawn without lifting your pencil from the paper).","output":"For the piecewise function to be continuous, the cases must \\\"meet\\\" at $2$ and $-2$. For example, $ax+3$ and $x-5$ must be equal when $x=2$. This implies $a(2)+3=2-5$, which we solve to get $2a=-6 \\Rightarrow a=-3$. Similarly, $x-5$ and $2x-b$ must be equal when $x=-2$. Substituting, we get $-2-5=2(-2)-b$, which implies $b=3$. So $a+b=-3+3=\\boxed{0}$."}] 
-#   if args.demo_examples:
-  #      args.demo_examples=eval(args.demo_examples)
-    
+
     path=iterative_training_framework(
         base_model_path=args.base_model_path,
         task_name=args.task_name,  
