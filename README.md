@@ -1,6 +1,9 @@
 # 🚀 Data-Synthesis-RL: Efficient Few-Shot RL Fine-Tuning with Synthetic Data Generation
 
-## Introduction
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
+
+## 💡 Introduction
 
 ![System Overview](img/final-one.png)
 
@@ -30,8 +33,12 @@ The system utilizes four key components:
 
 ## ⚙️ Workflow
 
-![Workflow Step 1](img/final1.4.png)
-![Workflow Step 2](img/final2.4.png)
+<table>
+<tr>
+<td><img src="img/final1.4.png" alt="Workflow Step 1" width="100%"></td>
+<td><img src="img/final2.4.png" alt="Workflow Step 2" width="100%"></td>
+</tr>
+</table>
 
 Given a base model ($\mathcal{M}_{base}$), task instruction ($\mathcal{I}$), and a few demonstration examples ($\mathcal{D}$), the training process involves four main steps:
 
@@ -47,14 +54,14 @@ Given a base model ($\mathcal{M}_{base}$), task instruction ($\mathcal{I}$), and
    * The base model $\mathcal{M}\_{base}$ attempts to solve the samples in $\mathcal{S}_{initial}$.
    * Samples are split into solved ($\mathcal{S}\_{solved}$) and unsolved ($\mathcal{S}_{unsolved}$) sets.
    * The $\text{LLM}\_{writer}$ generates harder samples ($\mathcal{S}\_{harder}$) from $\mathcal{S}\_{solved}$ and easier samples ($\mathcal{S}\_{easier}$) from $\mathcal{S}_{unsolved}$.
-   * All generated samples are combined: $\mathcal{S}\_{synth} = \mathcal{S}\_{initial} \cup \mathcal{S}\_{harder} \cup \mathcal{S}_{easier}$.
+   * All generated samples are combined: $\mathcal{S}\_{synth} = \mathcal{S}\_{initial} \cup \mathcal{S}\_{harder} \cup \mathcal{S}\_{easier}$.
 
 4. **Training with High-Potential Samples**:
    * Each sample $s \in \mathcal{S}_{synth}$ is scored based on the base model's consistency in solving it. Lower scores indicate inconsistency (higher potential).
    * The top $M$ samples with the lowest scores (those the model can solve occasionally but not always, or never solves) are selected.
    * The Trainer $T$ fine-tunes $\mathcal{M}\_{base}$ on this selected subset using reinforcement learning, resulting in the final trained model $\mathcal{M}_{trained}$.
 
-## Get started
+## 🚀 Getting Started
 
 ### 1. Create and activate a virtual environment
 
@@ -63,116 +70,81 @@ conda create -n data_rl python=3.10
 conda activate data_rl
 ```
 
-### 2. Install related libraries.
+### 2. Install related libraries
 
 ```bash
 sh activate.sh
 ```
 
-### 3. Put your OpenAI Key
+### 3. Configure OpenAI Key
 
-Place your openai key in ```model_inference/openai_call.py```
+Place your OpenAI key in `model_inference/openai_call.py`
 
 ### 4. Create Your Task-Specific Evaluation Folder
 
 Create a new directory for your task within `src/eval/tasks/`. This folder handles task-specific logic for the data generation and evaluation process and must include the following five Python scripts:
 
 * `process_label.py`: Extracts the ground truth label from the human-labeled output of a test sample.
-    * *Example (GSM8K):* Extracts `72` from `<human COT> #### 72`.
-    * *Example (LogiQA):* Transforms `'2'` into `'C'`.
 * `process_prediction.py`: Extracts the model's prediction from its full response to a test sample.
-    * *Example (LogiQA):* Extracts `'A'` from `<model COT> <result>A</result>`.
-* `eval_function.py`: Compares the extracted prediction with the ground truth label. Returns `True` if they match according to task criteria, `False` otherwise.
+* `eval_function.py`: Compares the extracted prediction with the ground truth label.
 * `get_output_instruction.py`: Provides the specific output format instruction for the model.
-    * *Example (GSM8K):* `"Let's think step by step and output the final result after '####'."`
-* `process_and_save_dataset.py`: Transforms a list of raw training data examples (e.g., `[{...},{...},...]`) into the format required for the Reinforcement Learning (RL) training  dataset and download and transform your test dataset for evaluation.
+* `process_and_save_dataset.py`: Transforms raw training data into the format required for RL training.
 
 ### 5. Define the Reward Function for RL Training
 
-To guide the Reinforcement Learning (RL) process for your task, you need to create a custom reward scoring function:
-
-1. **Create the Reward Script:** Add a new Python file (e.g., `your_task_reward.py`) inside the `verl/utils/reward_score/` directory.
-2. **Implement Scoring Logic:** Within this file, define a function that calculates a reward score based on the model's output. This function typically considers:
-    * **Format Score:** How well the output matches the required format.
-    * **Result Score:** Whether the final answer is correct.
-3. **Register the Function:** Modify the `verl/trainer/main_ppo.py` script. Specifically, import it at line 20 and update the `_select_rm_score_fn` function  to map your task's identifier (passed via the `data_source` argument) to your newly created reward function. This ensures the PPO trainer uses the correct scoring logic for your task.
+1. Create a new Python file (e.g., `your_task_reward.py`) in `verl/utils/reward_score/`
+2. Implement scoring logic considering format and result scores
+3. Register the function in `verl/trainer/main_ppo.py`
 
 ### 6. Prepare Passage Libraries for Retrieval
 
-The retriever component requires access to text corpora (passage libraries). You need to place these within the `src/retriever/passages/` directory.
+Place your text corpora in the `src/retriever/passages/` directory. You can use:
+- Standard corpora (e.g., Wikipedia, Wikihow, StackExchange)
+- Custom corpora in `.jsonl` format
 
-**Using Standard Corpora (Example: CRAFT):**
+### 7. Configure Demonstration Examples
 
-1. **Download:** Obtain corpus files, for example, the Wikipedia, Wikihow, and StackExchange archives (`.tar.gz`) recommended in Step 0 of the CRAFT repository: [https://github.com/ziegler-ingo/CRAFT](https://github.com/ziegler-ingo/CRAFT).
-2. **Extract:** Unzip the downloaded archives directly into the `src/retriever/passages/` directory.
-3. **Rename (if necessary):** Ensure the resulting directories containing the corpus data are named appropriately. For the CRAFT examples, the expected structure would be:
-    * `src/retriever/passages/wiki/`
-    * `src/retriever/passages/wikihow/`
-    * `src/retriever/passages/stackexchange/`
-
-**Using Custom Corpora:**
-
-* You can add your own text libraries to the `src/retriever/passages/` directory.
-* Custom libraries must be in the **`.jsonl`** format (JSON Lines).
-* Each line in the `.jsonl` file must be a valid JSON object (dictionary) containing at least a `'text'` key, where the value is the passage content string.
-    * *Example line:* `{"text": "This is the content of a single passage."}`
-
-### 7. Configure the Demonstration Example
-
-You can set a specific input/output example for demonstration or quick testing purposes directly within the main script.
-
-1. **Locate:** Open the `src/main.py` file. Find the section where the demonstration example is defined (the original documentation points near **line 575**, but note that this line number may change as the code evolves).
-2. **Set Example:** Modify the variable assignment to include your desired example(s). The required format is a Python list containing one or more dictionaries. Each dictionary must have an `'input'` key and an `'output'` key.
-
-    * **Format:**
-        ```python
-        [
-          {'input': 'Your example input prompt or question here', 'output': 'The corresponding desired or example output here'},
-          # You can add more examples if needed
-          # {'input': 'Another input', 'output': 'Another output'}
-        ]
-        ```
-### 8. Running an Experiment
-
-To execute an experiment, use the `src/main.py` script. You can specify the target GPUs using the `CUDA_VISIBLE_DEVICES` environment variable and configure the experiment using the following command-line arguments:
-
-* `--base_model_path`: Specifies the file path to the foundational language model directory (e.g., `./src/model/Qwen2.5-7B`).
-* `--task_name`: Identifies the specific task being run (e.g., `logiqa`).
-* `--task_instruction`: Provides the textual prompt defining the task objective for the model (e.g., `'You should answer logical reasoning questions accurately based on the provided context.'`).
-* `--dataset_path`: Points to the directory containing the dataset for this task (e.g., `'./src/data_logqa'`).
-* `--work_model_paths`: Specifies the file path to the specific model checkpoint(s) being used or evaluated in this run (e.g., `'./TinyZero/checkpoints/TinyZero'`).
-
-**Example Command:**
-
-This example runs the `gsm8k` task on GPUs 0 through 4.
-
-```bash
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4
-
-# Execute the script
-python src/main.py \
-  --base_model_path ./src/model/Qwen2.5-7B \
-  --task_name gsm8k \
-  --task_instruction 'You are given a word problem involving basic arithmetic, algebra, or geometry. Your task is to carefully read the problem and provide a step-by-step solution for it' \
-  --dataset_path './src/data_gsm8k' \
-  --work_model_paths './TinyZero/checkpoints/TinyZero'
+Set your input/output examples in `src/main.py` using the format:
+```python
+[
+    {'input': 'Your example input', 'output': 'Your example output'},
+    # Add more examples as needed
+]
 ```
 
-This example runs the `logiqa` task on GPUs 0 through 4.
+### 8. Running an Experiment
 
 ```bash
-# Set target GPUs (e.g., GPUs 0, 1, 2, 3, 4)
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4
 
-# Run the experiment script
 python src/main.py \
     --base_model_path ./src/model/Qwen2.5-7B \
-    --task_name logiqa \
-    --task_instruction 'You should answer logical reasoning questions accurately based on the provided context.' \
-    --dataset_path './src/data_logqa' \
+    --task_name your_task \
+    --task_instruction 'Your task instruction' \
+    --dataset_path './src/data_your_task' \
     --work_model_paths './TinyZero/checkpoints/TinyZero'
 ```
 
-### Citation
+## 📝 License
 
-Please consider citing our paper if you find this approach useful.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgements
+
+- [Qwen](https://github.com/QwenLM/Qwen) for the base model
+- [TinyZero](https://github.com/Jiayi-Pan/TinyZero) for the training framework
+- [veRL](https://github.com/volcengine/verl) for the reinforcement learning framework
+- All contributors and users of this project
+
+## 📚 Citation
+
+If you find our work helpful, please consider citing:
+
+```bibtex
+@misc{data-synthesis-rl,
+  title={Data-Synthesis-RL: Efficient Few-Shot RL Fine-Tuning with Synthetic Data Generation},
+  author={},
+  howpublished={\url{https://github.com/your-username/Data_Synthesis_RL}},
+  year={2024}
+}
+```
