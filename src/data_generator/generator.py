@@ -106,7 +106,7 @@ def data_sample_pattern(instruction: str, domain: str, num: int, store_name: str
     import os
     cur_path=os.getcwd()
     if not harder and not simpler:
-        print('load passage ...')
+        print('Retrieving passage ...')
         
         try:
             passages=torch.load(os.path.join(cur_path,'src','{0}.pt'.format(domain))) #'medical_passages_sub.pt')
@@ -123,7 +123,7 @@ def data_sample_pattern(instruction: str, domain: str, num: int, store_name: str
         except:
             synthetic_examples=[]
         start=len(synthetic_examples)
-        print('start with',start,'end with',num+3)
+        print('Generating data, which starts with',start,'ends with',num+3)
         if start>num:
             return synthetic_examples[:num]
         #pdb.set_trace()
