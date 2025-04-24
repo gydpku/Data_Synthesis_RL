@@ -563,7 +563,7 @@ if __name__ == "__main__":
                         help='Paths for work models (can be provided multiple times)')
     parser.add_argument('--iterations', type=int, default=5,
                         help='Number of iterations (default: 5)')
-    parser.add_argument('--passage_paths', type=List, default=['R1_tuner/src/retriever/passages/wiki','R1_tuner/src/retriever/passages/wikihow','R1_tuner/src/retriever/passages/stackexchange'],
+    parser.add_argument('--passage_paths', type=List, default=['./src/retriever/passages/wiki','./src/retriever/passages/wikihow','./src/retriever/passages/stackexchange'],
                         help='Paths for retrieval passages (can be provided mannually)')
     parser.add_argument('--domain', nargs="+", default=None,
                         help='Domain keywords (default: None)')
