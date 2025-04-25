@@ -578,7 +578,8 @@ if __name__ == "__main__":
         
     if 'math' in args.task_name:
         import datasets
-        for name in args.domain: #['Algebra','Intermediatealgebra','Pre-algebra','geometry','number theory', 'counting and probability','precaculus']: #['algebra', 'counting_and_probability', 'geometry', 'intermediate_algebra', 'number_theory', 'prealgebra', 'precalculus']:
+        args.demo_examples=[]
+        for name in ['algebra', 'counting_and_probability', 'geometry', 'intermediate_algebra', 'number_theory', 'prealgebra', 'precalculus']:
             dataset = datasets.load_dataset('EleutherAI/hendrycks_math', name)
             data = dataset['train'][0]
             new_data={'input':data['problem'],'output':data['solution']} 
