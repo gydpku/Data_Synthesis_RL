@@ -226,7 +226,7 @@ def majority_voting(example: Dict, task_name: str, n: int=4) -> tuple[Dict, Dict
     try:
         mode_value = mode(answers)
     except:
-        return None, None, None
+        return None, None, None, None
     mode_ids = [index for index, value in enumerate(answers) if value == mode_value]
     selected_response=[(responses[index],len(responses[index])) for index in mode_ids]
     selected_response.sort(key=lambda x:x[1])
