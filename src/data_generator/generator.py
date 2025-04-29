@@ -5,7 +5,6 @@ import numpy as np
 import re
 import random
 import os
-import random
 import json
 import requests
 from typing import List, Dict
@@ -58,20 +57,24 @@ def label_transform(label: int ) -> str:
         return 'entailment'
     if label==2:
         return 'contradiction'
-def aug_few_shot_prompt_pattern_generate(high_quality_examples: List[Dict], task_instruction: str, obj_passage: List[str],output_instruction:str) -> str:   
+def aug_few_shot_prompt_pattern_generate(high_quality_examples: List[Dict], task_instruction: str, obj_passage: List[str],output_instruction:str,input_instruction:str) -> str:   
     template=META_PROMPT
     #knowledge_prompt=f'extract and list the domain knowledge from the passage {obj_passage[:min(2048,len(obj_passage))]} that is related to the task instruction {task_instruction}. You should only output the knowledge without any other text. The knowledge is:'
     template+='You must consider the task instruction (task knowledge), and the passage (domain knowledge) to generate your training data.'
     template+=""" Here is the task instruction:{0}\n""".format(task_instruction)
+    if input_instruction:
+        template+=""" Here is the input instruction:{0}\n. You should follow the input format in the instruction strictly to generate data!!!""".format(input_instruction)
+    
     template+=""" Here is the output instruction:{0}\n. You should follow the output format in the instruction strictly to generate data!!!""".format(output_instruction)
     #template+=f"""Here is the sample pattern {pattern}. You should follow the input and output pattern strictly to generate data!!!""" 
     #pdb.set_trace()
-    '''
-    template+=""" You can refer to the provided examples. You should generate examples that are in the same difficulty or are harder. """ 
+    #template+=""" Here is the input instruction:{0}\n. You should follow the input format in the instruction strictly to generate data!!!""".format(input_instruction)
+    if high_quality_examples:
+        template+=""" You can refer to the provided examples. """ 
 
-    for id in range(len(high_quality_examples)):
-        template+='Demo Example {0}: {1}'.format(id,high_quality_examples[id])
-    '''
+        for id in range(len(high_quality_examples)):
+            template+='Demo Example {0}: {1}'.format(id,high_quality_examples[id])
+ 
     template+=" Here is some related knowledge passage that you must refer to. Your generated example must base on the knowledge/information of the passage." 
     template+="Related Objects or Passages:{0}".format(obj_passage[:min(2048,len(obj_passage))])
     new_examples=[]
@@ -99,14 +102,14 @@ def data_sample_pattern(instruction: str, domain: str, num: int, store_name: str
     print('load_cot_data...')
     demo_cot_examples=demo_examples
     
-    print(demo_cot_examples[0],'\n')
+   #print(demo_cot_examples[0],'\n')
     voting=True #    print(demo_examples[0],'\n')
 
     print('store_name','{0}.pt'.format(store_name))
     import os
     cur_path=os.getcwd()
     if not harder and not simpler:
-        print('Retrieving passage ...')
+        print('load passage ...')
         
         try:
             passages=torch.load(os.path.join(cur_path,'src','{0}.pt'.format(domain))) #'medical_passages_sub.pt')
@@ -123,32 +126,47 @@ def data_sample_pattern(instruction: str, domain: str, num: int, store_name: str
         except:
             synthetic_examples=[]
         start=len(synthetic_examples)
-        print('Generating data, which starts with',start,'ends with',num+3)
+        print('start with',start,'end with',num+3)
         if start>num:
             return synthetic_examples[:num]
-        #pdb.set_trace()
-        sampled_demo_examples=random.sample(demo_cot_examples, min(5,len(demo_cot_examples)))
-        pattern_prompt=f"""The task is {instruction}. Your task is to summarize the task's input and output parse format in general. You can refer to some demonstration examples of this task: {sampled_demo_examples}. You should output the input format first and then the output format."""
-        pattern=query_azure_openai_chatgpt_chat(pattern_prompt)
-        
+       
         examples_str=[]
         task_evaluator = TaskManager()
         task_evaluator.load_task(task_name)
         output_instruction=task_evaluator.get_output_instruction()
-        for num_id in range(start,num+3):
+        input_instruction=task_evaluator.get_input_instruction()
+        for num_id in range(start,num+3-len(examples_str)):
             
             sample_size = 1 # random.randint(1,5)
             sampled_objects = passages[num_id]
-            sampled_demo_examples=random.sample(demo_cot_examples, min(sample_demo_num,len(demo_cot_examples)))
-            examples_str.append(aug_few_shot_prompt_pattern_generate(sampled_demo_examples,task_instruction,sampled_objects,output_instruction))
+            sampled_demo_examples=None
+            if demo_cot_examples:
+                demo_prob=len(demo_cot_examples)/num
+                if demo_prob>random.uniform(0,1):
+                    sampled_demo_examples=random.sample(demo_cot_examples, min(sample_demo_num,len(demo_cot_examples)))
+            completed=False
+            while completed is False:
+                try:
+                    examples_str.append(aug_few_shot_prompt_pattern_generate(sampled_demo_examples,task_instruction,sampled_objects,output_instruction,input_instruction))
+                    completed=True
+                except:
+                    import time
+                    time.sleep(10)
+                
+                    #examples_str.append(aug_few_shot_prompt_pattern_generate(sampled_demo_examples,task_instruction,sampled_objects,output_instruction))
+            print(num_id,len(examples_str)) #pdb.set_trace()
+         #   torch.save(examples_str,'examples_str.pt')
+        #try:
+        #    format_checked_examples=torch.load('check.pt')
+        #except:
+        #    format_checked_examples=[]
+        #    for example in examples_str:
+        #        format_prompt = f"""Considering the task pattern: {pattern}, your task is to revise the input and output format of {example} to match the format of the high-quality examples: {sampled_demo_examples}. Output only the revised example, without any additional text."""
+        #        revised_example=query_azure_openai_chatgpt_chat(format_prompt)
+        #        format_checked_examples.append(revised_example)
+        #    torch.save(format_checked_examples,'check.pt') #pdb.set_trace()
+        results=examples_str #format_checked_examples
         #pdb.set_trace()
-        format_checked_examples=[]
-        for example in examples_str:
-            format_prompt = f"""Considering the task pattern: {pattern}, your task is to revise the input and output format of {example} to match the format of the high-quality examples: {sampled_demo_examples}. Output only the revised example, without any additional text."""
-            revised_example=query_azure_openai_chatgpt_chat(format_prompt)
-            format_checked_examples.append(revised_example)
-            #pdb.set_trace()
-        results=format_checked_examples
         synthetic_examples=precise_check(results,synthetic_examples,task_name,voting=voting)
         torch.save(synthetic_examples,os.path.join(cur_path,'src','{0}.pt'.format(store_name)))
     elif harder:
@@ -188,28 +206,24 @@ def precise_check(results,synthetic_examples: List[Dict],task_name: str, voting:
         vot_examples=[]
         for example_id,example in enumerate(new_examples):
             print(example_id)
-            short_output,random_output,long_output=majority_voting(example,task_name)
+            all_output,short_output,random_output,long_output=majority_voting(example,task_name)
             if random_output:
-                vot_examples.append({'input':example['input'],'output':random_output})
+                vot_examples.append({'input':example['input'],'output':random_output,'all':all_output})
         new_examples=vot_examples
     synthetic_examples.extend(new_examples)
     return synthetic_examples
 
-def majority_voting(example: Dict, task_name: str, n: int=4) -> tuple[Dict, Dict, Dict]:
-    example_input=example['input']
-    output=example['output']
+def majority_voting(example: Dict, task_name: str, n: int=16) -> tuple[Dict, Dict, Dict]:
+    try:
+        example_input=example['input']
+        output=example['output']
+    except:
+        print('parse error in major voting')
+        return None,None,None,None
     task_evaluator = TaskManager()
     task_evaluator.load_task(task_name)
     output_instruction=task_evaluator.get_output_instruction()
     prompt=str(example_input)+output_instruction
-    '''
-    if 'nli' in task_name.lower():
-        prompt="You should give an output to the query and use 'The final answer is xxx' to end your output."+input+"Let's think step by step."
-    elif 'gsm8k' in task_name.lower():
-        prompt="You should give an output to the query and use '### final answer' to end your output."+input+"Let's think step by step."
-    else:
-        prompt="You should give an output to the query and use 'The final answer is xxx' to end your output."+input+"Let's think step by step."
-    '''
     responses=query_azure_openai_chatgpt_chat(prompt,temperature=0.7,n=n)
     responses.append(output)
     
@@ -217,7 +231,10 @@ def majority_voting(example: Dict, task_name: str, n: int=4) -> tuple[Dict, Dict
     # Load task1 and bind its functions to the manager
     answers = []
     for response in responses:
-        result = task_evaluator.process_prediction(response)
+        try: #pdb.set_trace()
+            result = task_evaluator.process_prediction(str(response))
+        except:
+            pdb.set_trace()
         if result is not None:
             answers.append(result)
     #import pdb
@@ -226,11 +243,11 @@ def majority_voting(example: Dict, task_name: str, n: int=4) -> tuple[Dict, Dict
     try:
         mode_value = mode(answers)
     except:
-        return None, None, None, None
+        return None,None, None, None
     mode_ids = [index for index, value in enumerate(answers) if value == mode_value]
     selected_response=[(responses[index],len(responses[index])) for index in mode_ids]
     selected_response.sort(key=lambda x:x[1])
-    return selected_response[0][0],responses[random.choice(mode_ids)],selected_response[-1][0]
+    return selected_response,selected_response[0][0],responses[random.choice(mode_ids)],selected_response[-1][0]
 def clean_input(input: str) -> str:
     if 'output' in input:
         input=input.split('output')[0]

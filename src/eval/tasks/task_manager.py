@@ -16,7 +16,7 @@ class TaskManager:
         return getattr(module, function_name)
     def load_task(self, task_name):
         """Loads all functions for a given task and binds them to the manager."""
-        for func_name in ["process_label", "process_prediction", "eval_function","process_and_save_dataset","get_output_instruction"]:
+        for func_name in ["process_label", "process_prediction", "eval_function","process_and_save_dataset","get_input_instruction","get_output_instruction"]:
             func = self._load_function(task_name, func_name)
             setattr(self, func_name, func)
     

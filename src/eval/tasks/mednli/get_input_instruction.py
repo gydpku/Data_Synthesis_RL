@@ -1,0 +1,2 @@
+def get_input_instruction():
+    return "Your input should start with 'Please classify the relationship between the premise and the hypothesis as 'entailment','neutral' or 'contradiction'.'. Then the premise sentence, and then the hypothesis sentence." # enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> thinking process here </think> <answer> the correct option here </answer>. '

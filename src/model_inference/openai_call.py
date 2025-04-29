@@ -9,7 +9,7 @@ from typing import List, Dict
 from vllm import LLM, SamplingParams
 
 encoding = tiktoken.encoding_for_model("gpt-4")
-openai.api_key = 'xxx'
+openai.api_key ='xxx'
 def truncate_text_with_token_count(text: str, max_tokens: int) -> str:
     num_tokens = len(encoding.encode(text))
     if num_tokens > max_tokens:
@@ -21,10 +21,16 @@ def query_azure_openai_chatgpt_chat(query: str, model: str="gpt-4o", temperature
     truncated_input = truncate_text_with_token_count(query, 30000)
 
     client = OpenAI(api_key=openai.api_key)
-
-    response = client.chat.completions.create(model=model, messages=[
+    try:
+        response = client.chat.completions.create(model=model, messages=[
         {"role": "system", "content": "You are a helpful AI assistant."},
         {"role": "user", "content": truncated_input}, ], temperature=temperature, max_tokens=4000,n=n)
+    except:
+        import time
+        time.sleep(10)
+        response = client.chat.completions.create(model=model, messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant."},
+                            {"role": "user", "content": truncated_input}, ], temperature=temperature, max_tokens=4000,n=n)
     responses = [choice.message.content for choice in response.choices]
     if n==1:
         return responses[0] 
@@ -33,9 +39,16 @@ def query_azure_openai_chatgpt_chat(query: str, model: str="gpt-4o", temperature
 def query_openai_chatgpt(query: str,api_key: str, model: str = "gpt-4", temperature: float = 0, n: int = 1) -> str:
     truncated_input = truncate_text_with_token_count(query, 30000)
     client = OpenAI(api_key=api_key)
-    response = client.chat.completions.create(model=model, messages=[
+    try:
+        response = client.chat.completions.create(model=model, messages=[
         {"role": "system", "content": "You are a helpful AI assistant."},
         {"role": "user", "content": truncated_input}, ], temperature=temperature, max_tokens=4000,n=n)
+        import time
+        time.sleep(1)
+    except:
+        import time
+        time.sleep(120)
+
     responses = [choice.message.content for choice in response.choices]
     if n==1:
         return responses[0] 

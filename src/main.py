@@ -1,6 +1,7 @@
 import torch.distributed as dist
 import numpy as np
 import pdb
+import pandas as pd
 from typing import List, Dict, Union, Literal
 from data_generator.generator import data_sample_pattern
 from model_inference.openai_call import query_azure_openai_chatgpt_chat
@@ -142,7 +143,7 @@ class TaskBuffer:
               new_buffer.append(data)
         self.learnable_buffer=new_buffer
 
-    def calculate_score(self, working_model, tasker,datapoints,n=32,temperature=1.2,self_update=False):
+    def calculate_score(self, working_model, tasker,datapoints,n=64,temperature=1.2,self_update=False):
         learnable_buffer = []
         hard_buffer=[]
         easy_buffer=[]
@@ -151,26 +152,34 @@ class TaskBuffer:
             datapoints=self.learnable_buffer
         for id in range(len(datapoints) // 100 + 1):
             batch=datapoints[id*100:(id+1)*100]
+            if not batch:
+                continue
             batch_inputs = [point['input'] for point in batch]
             instruction_following=tasker.get_output_instruction()
             batch_prompt=[str(point['input'])+instruction_following for point in batch]
             batch_labels=[point['output'] for point in batch]
+            if 'all' in batch[0]:
+                batch_teacher_outputs=[point['all'] for point in batch]
+            else:
+                batch_teacher_outputs=[point['teacher_outputs'] for point in batch]
+            #batch_teacher_outputs=[point['all'] for point in batch]
             batch_response=working_model.generate(batch_prompt,n=n,temperature=temperature)
             
-            for inp, out, truth in zip(batch_inputs, batch_response, batch_labels):
+            for inp, out, truth,t_out in zip(batch_inputs, batch_response, batch_labels, batch_teacher_outputs):
                 #preds = [tasker.process_prediction(pred) for pred in out]
-                preds = [pred for pred in out]
+                preds = [pred for pred in out] if isinstance(out, list) else [out]
                 label = tasker.process_label(truth)
                 results=[tasker.eval_function(pred, label) for pred in preds]
+                correct_preds=[pred for pred in preds if tasker.eval_function(pred, label)]
                 score=sum(results)/len(results)
                 #pdb.set_trace()
                 if score==0:
                     #pdb.set_trace()
-                    hard_buffer.append({'input': inp, 'output': truth, 'score': score})
+                    hard_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
                 elif score==1:
-                    easy_buffer.append({'input': inp, 'output': truth, 'score': score})
+                    easy_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
                 else:
-                    learnable_buffer.append({'input': inp, 'output': truth, 'score': score})
+                    learnable_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
                 #new_buffer.append({'input': inp, 'output': truth, 'score': score})
         if self_update:
             self.learnable_buffer=learnable_buffer
@@ -179,7 +188,7 @@ class TaskBuffer:
         else:   
             return easy_buffer,learnable_buffer,hard_buffer #self.buffer = new_buffer
 
-    def generate_train_batch(self,train_num,prob_sampling=False,easy_to_hard=False):
+    def generate_RL_train_batch(self,train_num,prob_sampling=False,easy_to_hard=False):
         train_dataset = []
         if prob_sampling:
             probabilities=[1-x['score']+1e-3 for x in self.learnable_buffer]
@@ -197,19 +206,73 @@ class TaskBuffer:
         for i in range(min(train_num,len(self.learnable_buffer))):
             train_dataset.append({'input': self.learnable_buffer[i]['input'], 'output': self.learnable_buffer[i]['output']})
         scores=[data['score'] for data in self.learnable_buffer[:len(train_dataset)]]
-        import numpy as np
+        
         try:
             scores_record=torch.load('scores_record.pt')
         except:
             scores_record=[]
         scores_record.append([np.mean(scores),np.std(scores),np.max(scores),np.min(scores),scores])
         torch.save(scores_record,'scores_record.pt')
-
-         #self.index = train_num
-        #self.trained_buffer.extend(self.learnable_buffer[:train_num])
-        #self.learnable_buffer = self.learnable_buffer[train_num:]
-        #train_dataset #.reverse()
         return train_dataset
+    def generate_SFT_train_batch(self,train_num,is_whole=False,is_rewrite=False):
+        self.gather_buffer()
+        train_dataset = {'input': [], 'output': []} 
+        probabilities=[1-x['score']+1e-3 for x in self.learnable_buffer]
+        if is_whole:
+            for prob_id,prob in enumerate(probabilities):
+                random_prob=random.random()
+                if random_prob<prob:
+                    train_dataset['input'].append(self.learnable_buffer[prob_id]['input'])
+                    train_dataset['output'].append(random.choice(self.learnable_buffer[prob_id]['teacher_outputs'])[0])
+                else:
+                    train_dataset['input'].append(self.learnable_buffer[prob_id]['input'])
+                    try:
+                        train_dataset['output'].append(random.choice(self.learnable_buffer[prob_id]['self_correct_outputs']))
+                    except:
+                        train_dataset['output'].append(random.choice(self.learnable_buffer[prob_id]['teacher_outputs'])[0])
+            df = pd.DataFrame(train_dataset)
+            local_dir = os.path.expanduser(os.path.join('./','sft_data'))
+            os.makedirs(local_dir, exist_ok=True)
+            local_path = os.path.join(local_dir,'train.parquet')
+            df.to_parquet(path=local_path)
+            probabilities = np.array(probabilities)
+            probabilities = probabilities / probabilities.sum()
+            test_indices = np.random.choice(len(self.learnable_buffer), size=int(train_num*0.4), replace=True, p=probabilities)
+            test_sampled_data = [self.learnable_buffer[i] for i in test_indices]
+            test_dataset = {'input': [], 'output': []}
+            for i in range(int(train_num*0.4)):
+                test_dataset['input'].append(test_sampled_data[i]['input'])
+                test_dataset['output'].append(random.choice(test_sampled_data[i]['teacher_outputs'])[0])
+            test_df = pd.DataFrame(test_dataset)
+            test_local_dir = os.path.expanduser(os.path.join('./','sft_data'))
+            os.makedirs(test_local_dir, exist_ok=True)
+            test_local_path = os.path.join(test_local_dir,'test.parquet')
+            test_df.to_parquet(path=test_local_path)
+            return train_dataset,local_dir
+        probabilities = np.array(probabilities)
+        probabilities = probabilities / probabilities.sum()
+        indices = np.random.choice(len(self.learnable_buffer), size=train_num, replace=True, p=probabilities)
+        sampled_data = [self.learnable_buffer[i] for i in indices]
+        for i in range(train_num):
+            train_dataset['input'].append(sampled_data[i]['input'])
+            train_dataset['output'].append(random.choice(sampled_data[i]['teacher_outputs'])[0])
+        df = pd.DataFrame(train_dataset)
+        local_dir = os.path.expanduser(os.path.join('./','sft_data'))
+        os.makedirs(local_dir, exist_ok=True)
+        local_path = os.path.join(local_dir,'train.parquet')
+        df.to_parquet(path=local_path)
+        test_indices = np.random.choice(len(self.learnable_buffer), size=int(train_num*0.4), replace=True, p=probabilities)
+        test_sampled_data = [self.learnable_buffer[i] for i in test_indices]
+        test_dataset = {'input': [], 'output': []}
+        for i in range(int(train_num*0.4)):
+            test_dataset['input'].append(test_sampled_data[i]['input'])
+            test_dataset['output'].append(random.choice(test_sampled_data[i]['teacher_outputs'])[0])
+        test_df = pd.DataFrame(test_dataset)
+        test_local_dir = os.path.expanduser(os.path.join('./','sft_data'))
+        os.makedirs(test_local_dir, exist_ok=True)
+        test_local_path = os.path.join(test_local_dir,'test.parquet')
+        test_df.to_parquet(path=test_local_path)
+        return train_dataset,local_dir
 
     def update_buffer(self, data):
         self.learnable_buffer.extend(data)
@@ -266,7 +329,9 @@ class Trainer:
                  experiment_name="run_1",
                  temperature=1.2,
                  rollout_n=16,
-                 batch_size=4,
+                 rl_batch_size=4,
+                 sft_batch_size=64,
+                 max_length=8192,
                  response_length=2048):
         """
         Initializes the Trainer class with training parameters based on the corrected meanings.
@@ -278,50 +343,84 @@ class Trainer:
             batch_size (int): Batch size for training (e.g., 4).
             response_length (int): Maximum response length (e.g., 2048).
         """
-        self.dataset_path = dataset_path
+        self.sft_dataset_path = ''
+        self.rl_dataset_path = ''
         self.model_path=model_path
         self.work_dir=work_dir
         self.experiment_name=experiment_name
         self.temperature = temperature
         self.rollout_n = rollout_n
-        self.batch_size = batch_size
+        self.sft_batch_size = sft_batch_size
+        self.rl_batch_size = rl_batch_size
+        self.max_length = max_length
         self.response_length = response_length
         
-        self.command = [
+        self.run_completed = False # Flag to track if run() was executed
+
+    def RL_run(self):
+        """
+        Executes the shell command using subprocess.
+        """
+        import os
+        cur_path=os.getcwd()
+        self.RL_command = [
             "sh",
-            "./TinyZero/train_base.sh",
-            self.dataset_path,
+            os.path.join(cur_path, "TinyZero", "train_RL_base.sh"),
+            self.rl_dataset_path,
             self.model_path,
             self.experiment_name,
             str(self.temperature),
             str(self.rollout_n),
-            str(self.batch_size),
+            str(self.rl_batch_size),
             str(self.response_length)
         ]
-        self.run_completed = False # Flag to track if run() was executed
+        try:
+            print("Executing shell command...")
+            process = subprocess.run(
+                self.RL_command,
+                check=True,  # Raise exception on non-zero exit code
+                capture_output=True, # Capture stdout and stderr
+                text=True # Decode stdout and stderr as text
+            )
+            print("Shell command executed successfully.")
+            print("--- Command Output (stdout) ---")
+            print(process.stdout)
+            if process.stderr: # Only print stderr if it's not empty
+                print("--- Command Output (stderr) ---")
+                print(process.stderr)
+            self.run_completed = True # Set flag to True after successful run
 
-    def run(self):
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing shell command:")
+            print(f"Return Code: {e.returncode}")
+            print(f"Stdout: {e.stdout}")
+            print(f"Stderr: {e.stderr}")
+            self.run_completed = False # Command failed
+
+        except FileNotFoundError:
+            print(f"Error: Could not find 'launch_distributed_project.sh' or 'sh' command. "
+                  f"Make sure they are in your system's PATH or the script is in the correct directory.")
+            self.run_completed = False
+    def SFT_run(self,save_model_path,max_length=8192):
         """
         Executes the shell command using subprocess.
         """
         import os
         cur_path=os.getcwd()
         
-        self.command = [
+        self.SFT_command = [
             "sh",
-            os.path.join(cur_path, "TinyZero", "train_base.sh"),
-            self.dataset_path,
+            os.path.join(cur_path, "TinyZero", "train_SFT_base.sh"),
+            self.sft_dataset_path,
             self.model_path,
-            self.experiment_name,
-            str(self.temperature),
-            str(self.rollout_n),
-            str(self.batch_size),
-            str(self.response_length)
+            save_model_path,
+            str(self.sft_batch_size),
+            str(max_length),
         ]
         try:
             print("Executing shell command...")
             process = subprocess.run(
-                self.command,
+                self.SFT_command,
                 check=True,  # Raise exception on non-zero exit code
                 capture_output=True, # Capture stdout and stderr
                 text=True # Decode stdout and stderr as text
@@ -489,7 +588,7 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
     data_generator = DataGenerator(task_instruction,demo_examples,domain,multi_task)
     
     Tasker = TaskManager()
-    RL_Trainer=Trainer(model_path=base_model_path)
+    Model_Trainer=Trainer(model_path=base_model_path)
     Tasker.load_task(task_name)
     all_hard_data=[]
     Buffer=TaskBuffer()
@@ -498,7 +597,11 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
         try:
             import os
             cur_path=os.getcwd()
-            train_data=torch.load(os.path.join(cur_path,'src','train_data_{0}_{1}.pt'.format(task_name,iter_num)))
+            #train_rl_data=torch.load(os.path.join(cur_path,'src','train_data_{0}_{1}.pt'.format(task_name,iter_num)))
+            Buffer=torch.load(os.path.join(cur_path,'src','buffer_{0}_{1}.pt'.format(task_name,iter_num)))
+            #train_sft_data=torch.load(os.path.join(cur_path,'src','train_sft_data_{0}_{1}.pt'.format(task_name,iter_num)))
+            #sft_model_path='./sft_{0}_model'.format(task_name)
+            #SFT_data_path=torch.load(os.path.join(cur_path,'src','train_sft_path_{0}_{1}.pt'.format(task_name,iter_num)))
         except:
          # 1. Initial Data Generation (GSM8K)       
             initial_data = data_generator.generate_initial_data(demo_examples,task_name,task_instruction,iter_num,multi_task,passage_paths)
@@ -507,8 +610,8 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
             Buffer.update_buffer(initial_data) # 2. Inference and Performance Evaluation (GSM8K)
             
             Buffer.check_label(Tasker) #       new_hard_data=[] #all_hard_data #[]
-            
-            Buffer.calculate_score(working_model, Tasker, Buffer.learnable_buffer,self_update=True)
+     
+            Buffer.calculate_score(working_model, Tasker, Buffer.learnable_buffer,self_update=True,n=1,temperature=0.0)
             if Buffer.hard_buffer:
                 easier_data=data_generator.generate_easier_data(Buffer.hard_buffer,task_instruction,task_name,iter_num,multi_task,passage_paths)
                 easy,learnable,hard=Buffer.calculate_score(working_model, Tasker,easier_data,self_update=False)
@@ -521,22 +624,45 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
                 Buffer.learnable_buffer.extend(learnable)
                 Buffer.hard_buffer.extend(hard)
                 Buffer.easy_buffer.extend(easy)
+            Buffer.calculate_score(working_model, Tasker, Buffer.learnable_buffer,self_update=True)
             working_model.quit()
             del working_model
-            train_data=Buffer.generate_train_batch(train_num=500,prob_sampling=False,easy_to_hard=False)
+            #train_SFT_data,SFT_data_path=Buffer.generate_SFT_train_batch(train_num=500)
+            
             import os
             cur_path=os.getcwd()
-            torch.save(train_data,os.path.join(cur_path,'src','train_data_{0}_{1}.pt'.format(task_name,iter_num))) 
+            torch.save(Buffer,os.path.join(cur_path,'src','buffer_{0}_{1}.pt'.format(task_name,iter_num)))
+            #torch.save(train_SFT_data,os.path.join(cur_path,'src','train_sft_data_{0}_{1}.pt'.format(task_name,iter_num)))
+            #torch.save(SFT_data_path,os.path.join(cur_path,'src','train_sft_path_{0}_{1}.pt'.format(task_name,iter_num)))  #corch.save(train_RL_data,os.path.join(cur_path,'src','train_rl_data_{0}_{1}.pt'.format(task_name,iter_num)))
+        #Model_Trainer.sft_dataset_path=SFT_data_path
+        Model_Trainer.model_path=base_model_path
+        #pdb.set_trace()
+        sft_model_path='sft-{0}-model'.format(task_name)
+        #Model_Trainer.SFT_run(sft_model_path,max_length=8192)
             
-        Tasker.process_and_save_dataset(train_data, task_name, dataset_path)
+        try:
+            import os
+            cur_path=os.getcwd()
+            train_RL_data=torch.load(os.path.join(cur_path,'src','train_rl_data_{0}_{1}.pt'.format(task_name,iter_num)))
+        except:
+            working_model = WorkingModel(base_model_path,task_name)
+            Buffer.calculate_score(working_model, Tasker, Buffer.learnable_buffer,self_update=True)
+            working_model.quit()
+            del working_model
+            train_RL_data=Buffer.generate_RL_train_batch(train_num=500,prob_sampling=False,easy_to_hard=False)
+            import os
+            cur_path=os.getcwd()
+            torch.save(train_RL_data,os.path.join(cur_path,'src','train_rl_data_{0}_{1}.pt'.format(task_name,iter_num))) 
+            
+        Tasker.process_and_save_dataset(train_RL_data, task_name, dataset_path)
         
-        RL_Trainer.dataset_path=dataset_path
-        RL_Trainer.model_path=base_model_path #working_model_path #base_model_path
-        RL_Trainer.experiment_name=f"1_{task_name}_{iter_num}"
+        Model_Trainer.rl_dataset_path=dataset_path
+        Model_Trainer.model_path=base_model_path #working_model_path #base_model_path
+        Model_Trainer.experiment_name=f"1_{task_name}_{iter_num}"
 
-        RL_Trainer.run()
+        Model_Trainer.RL_run()
 
-        new_model_path=RL_Trainer.test_run()
+        new_model_path=Model_Trainer.test_run()
         if new_model_path:
             working_model_path=new_model_path
         pdb.set_trace()
@@ -577,9 +703,9 @@ if __name__ == "__main__":
 
         
     if 'math' in args.task_name:
-        import datasets
         args.demo_examples=[]
-        for name in ['algebra', 'counting_and_probability', 'geometry', 'intermediate_algebra', 'number_theory', 'prealgebra', 'precalculus']:
+        import datasets
+        for name in args.domain: #['Algebra','Intermediatealgebra','Pre-algebra','geometry','number theory', 'counting and probability','precaculus']: #['algebra', 'counting_and_probability', 'geometry', 'intermediate_algebra', 'number_theory', 'prealgebra', 'precalculus']:
             dataset = datasets.load_dataset('EleutherAI/hendrycks_math', name)
             data = dataset['train'][0]
             new_data={'input':data['problem'],'output':data['solution']} 
