@@ -2,7 +2,7 @@ temperature=$1
 rollout=$2
 batch_size=$3
 response_length=$4
-python3 -m verl.trainer.main_ppo \
+python3 -m src.verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files=$DATA_DIR/train.parquet \
     data.val_files=$DATA_DIR/test.parquet \
