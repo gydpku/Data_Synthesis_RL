@@ -132,8 +132,8 @@ def get_names(path):
 class TaskBuffer:
     def __init__(self):
         self.learnable_buffer = []
-        self.hard_buffer=[]
-        self.easy_buffer=[]
+        self.unsolved_buffer=[]
+        self.solved_buffer=[]
         self.trained_buffer = []
         self.index = -1
     def check_label(self,Tasker):
@@ -142,11 +142,21 @@ class TaskBuffer:
           if Tasker.process_label(data['output']):
               new_buffer.append(data)
         self.learnable_buffer=new_buffer
+        new_buffer=[]
+        for data in self.unsolved_buffer:
+          if Tasker.process_label(data['output']):
+              new_buffer.append(data)
+        self.unsolved_buffer=new_buffer
+        new_buffer=[]
+        for data in self.solved_buffer:
+          if Tasker.process_label(data['output']):
+              new_buffer.append(data)
+        self.solved_buffer=new_buffer
 
     def calculate_score(self, working_model, tasker,datapoints,n=64,temperature=1.2,self_update=False):
         learnable_buffer = []
-        hard_buffer=[]
-        easy_buffer=[]
+        unsolved_buffer=[]
+        solved_buffer=[]
         if self_update:
             self.gather_buffer()
             datapoints=self.learnable_buffer
@@ -175,18 +185,18 @@ class TaskBuffer:
                 #pdb.set_trace()
                 if score==0:
                     #pdb.set_trace()
-                    hard_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
+                    unsolved_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
                 elif score==1:
-                    easy_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
+                    solved_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
                 else:
                     learnable_buffer.append({'input': inp, 'output': truth, 'score': score,'teacher_outputs':t_out,'self_correct_outputs':correct_preds})
                 #new_buffer.append({'input': inp, 'output': truth, 'score': score})
         if self_update:
             self.learnable_buffer=learnable_buffer
-            self.hard_buffer=hard_buffer
-            self.easy_buffer=easy_buffer
+            self.unsolved_buffer=unsolved_buffer
+            self.solved_buffer=solved_buffer
         else:   
-            return easy_buffer,learnable_buffer,hard_buffer #self.buffer = new_buffer
+            return solved_buffer,learnable_buffer,unsolved_buffer #self.buffer = new_buffer
 
     def generate_RL_train_batch(self,train_num,prob_sampling=False,easy_to_hard=False):
         train_dataset = []
@@ -277,10 +287,10 @@ class TaskBuffer:
     def update_buffer(self, data):
         self.learnable_buffer.extend(data)
     def gather_buffer(self):
-        self.learnable_buffer.extend(self.hard_buffer)
-        self.learnable_buffer.extend(self.easy_buffer)
-        self.hard_buffer=[]
-        self.easy_buffer=[]
+        self.learnable_buffer.extend(self.unsolved_buffer)
+        self.learnable_buffer.extend(self.solved_buffer)
+        self.unsolved_buffer=[]
+        self.solved_buffer=[]
 
 
 class Trainer:
@@ -612,33 +622,27 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
             Buffer.check_label(Tasker) #       new_hard_data=[] #all_hard_data #[]
      
             Buffer.calculate_score(working_model, Tasker, Buffer.learnable_buffer,self_update=True,n=1,temperature=0.0)
-            if Buffer.hard_buffer:
-                easier_data=data_generator.generate_easier_data(Buffer.hard_buffer,task_instruction,task_name,iter_num,multi_task,passage_paths)
+            if Buffer.unsolved_buffer:
+                easier_data=data_generator.generate_easier_data(Buffer.unsolved_buffer,task_instruction,task_name,iter_num,multi_task,passage_paths)
                 easy,learnable,hard=Buffer.calculate_score(working_model, Tasker,easier_data,self_update=False)
                 Buffer.learnable_buffer.extend(learnable)
-                Buffer.hard_buffer.extend(hard)
-                Buffer.easy_buffer.extend(easy)
-            if Buffer.easy_buffer:
-                harder_data=data_generator.generate_hard_data(Buffer.easy_buffer,task_instruction,task_name,iter_num,multi_task,passage_paths)
+                Buffer.unsolved_buffer.extend(hard)
+                Buffer.solved_buffer.extend(easy)
+            if Buffer.solved_buffer:
+                harder_data=data_generator.generate_hard_data(Buffer.solved_buffer,task_instruction,task_name,iter_num,multi_task,passage_paths)
                 easy,learnable,hard=Buffer.calculate_score(working_model, Tasker,harder_data,self_update=False)
                 Buffer.learnable_buffer.extend(learnable)
-                Buffer.hard_buffer.extend(hard)
-                Buffer.easy_buffer.extend(easy)
-            Buffer.calculate_score(working_model, Tasker, Buffer.learnable_buffer,self_update=True)
+                Buffer.unsolved_buffer.extend(hard)
+                Buffer.solved_buffer.extend(easy)
+            Buffer.check_label(Tasker)
             working_model.quit()
             del working_model
-            #train_SFT_data,SFT_data_path=Buffer.generate_SFT_train_batch(train_num=500)
             
             import os
             cur_path=os.getcwd()
             torch.save(Buffer,os.path.join(cur_path,'src','buffer_{0}_{1}.pt'.format(task_name,iter_num)))
-            #torch.save(train_SFT_data,os.path.join(cur_path,'src','train_sft_data_{0}_{1}.pt'.format(task_name,iter_num)))
-            #torch.save(SFT_data_path,os.path.join(cur_path,'src','train_sft_path_{0}_{1}.pt'.format(task_name,iter_num)))  #corch.save(train_RL_data,os.path.join(cur_path,'src','train_rl_data_{0}_{1}.pt'.format(task_name,iter_num)))
-        #Model_Trainer.sft_dataset_path=SFT_data_path
         Model_Trainer.model_path=base_model_path
-        #pdb.set_trace()
         sft_model_path='sft-{0}-model'.format(task_name)
-        #Model_Trainer.SFT_run(sft_model_path,max_length=8192)
             
         try:
             import os
