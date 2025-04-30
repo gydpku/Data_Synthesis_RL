@@ -14,12 +14,12 @@ This project implements an efficient approach for fine-tuning a base language mo
 The system utilizes four key components:
 
 1. **🔍 Passage Retriever ($\mathcal{P}$)**:
-   * Takes keywords (extracted from the task instruction $\mathcal{I}$ and demos $\mathcal{D}$ using the teacher model $\mathcal{T}$) as input.
-   * Searches a large text library ($\mathcal{L}$, e.g., Wikipedia) to find relevant passages ($\mathcal{R}$) that provide external context.
+   * Takes keywords (extracted from the task description instruction $\mathcal{I}_\textit{des}$ and demos $\mathcal{D}$ (optional)using the teacher model $\mathcal{T}$) as input.
+   * Searches a large text library ($\mathcal{L}$, e.g., Wikipedia) to find relevant passages ($\mathcal {R}$) that provide external context.
 
 2. **📊 LLM Data Generator ($\text{LLM}_{generator}$)**:
    * Uses the teacher model ($\mathcal{T}$) to synthesize new training data ($\mathcal{S}_{initial}$).
-   * Takes task instructions ($\mathcal{I}$), summarized sample patterns ($P$), demonstration examples ($\mathcal{D}$), and retrieved passages ($\mathcal{R}$) as input.
+   * Takes task description instruction ($\mathcal{I}_\textit{des}$), input format instruction ($\mathcal{I}_\textit{input}$), output format instruction ($\mathcal{I}_\textit{output}$), summarized sample patterns ($P$), demonstration examples ($\mathcal{D}$), and retrieved passages ($\mathcal{R}$) as input.
    * Incorporates a verification step (e.g., majority voting) to ensure data quality.
 
 3. **✍️ LLM Data Re-writer ($\text{LLM}_{writer}$)**:
@@ -76,19 +76,21 @@ conda activate data_rl
 sh activate.sh
 ```
 
-### 3. Configure OpenAI Key
+### 3. Configure OpenAI Key and wandb key
 
 Place your OpenAI key in `model_inference/openai_call.py`
+Place your Wandb key in `TinyZero/train_RL_base.sh`
 
 ### 4. Create Your Task-Specific Evaluation Folder
 
 Create a new directory for your task within `src/eval/tasks/`. This folder handles task-specific logic for the data generation and evaluation process and must include the following five Python scripts:
 
 * `process_label.py`: Extracts the ground truth label from the human-labeled output of a test sample.
-* `process_prediction.py`: Extracts the model's prediction from its full response to a test sample.
+* `process_prediction.py`: Extracts the model's prediction result from its full response to a test sample.
 * `eval_function.py`: Compares the extracted prediction with the ground truth label.
 * `get_output_instruction.py`: Provides the specific output format instruction for the model.
-* `process_and_save_dataset.py`: Transforms raw training data into the format required for RL training.
+* `get_input_instruction.py`: Provides the specific input format instruction for the model.
+* `process_and_save_dataset.py`: download the test dataset and transforms it and synthesis training data into the format required for RL training.
 
 ### 5. Define the Reward Function for RL Training
 
