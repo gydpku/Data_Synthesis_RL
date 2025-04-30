@@ -39,7 +39,10 @@ def process_and_save_dataset(train_data, data_source,local_dir):
             question = question_raw + ' ' + instruction_following
             try:
                 answer_raw = example.pop('output')
-                solution = process_prediction(answer_raw)
+                if split=='train':
+                    solution = process_prediction(answer_raw)
+                else:
+                    solution=answer_raw
 
                 data = {
                     "data_source": data_source,
