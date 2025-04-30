@@ -178,7 +178,7 @@ class TaskBuffer:
             for inp, out, truth,t_out in zip(batch_inputs, batch_response, batch_labels, batch_teacher_outputs):
                 #preds = [tasker.process_prediction(pred) for pred in out]
                 preds = [pred for pred in out] if isinstance(out, list) else [out]
-                label = tasker.process_label(truth)
+                label = tasker.process_prediction(truth)
                 results=[tasker.eval_function(pred, label) for pred in preds]
                 correct_preds=[pred for pred in preds if tasker.eval_function(pred, label)]
                 score=sum(results)/len(results)
