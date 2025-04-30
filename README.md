@@ -7,7 +7,7 @@
 
 ![System Overview](img/final-one.png)
 
-This project implements an efficient approach for fine-tuning a base language model ($\mathcal{M}_{base}$) when only a few demonstration examples ($\mathcal{D}$) are available. It leverages a powerful teacher large language model ($\mathcal{T}$), external knowledge retrieval, and strategic synthetic data generation to create an effective training dataset. The base model is then trained on the most informative subset of this synthetic data using reinforcement learning.
+This project implements an efficient approach for fine-tuning a base language model ($\mathcal{M}_{base}$) when only task instructions and a few demonstration examples $\mathcal{D}$ (optional) are available. It leverages a powerful teacher large language model ($\mathcal{T}$), external knowledge retrieval, and strategic synthetic data generation to create an effective training dataset. The base model is then trained on the most informative subset of this synthetic data using reinforcement learning.
 
 ## 🛠️ Components
 
