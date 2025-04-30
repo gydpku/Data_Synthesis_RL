@@ -26,9 +26,7 @@ def process_and_save_dataset(train_data, data_source,local_dir):
     ori_test_dataset = datasets.load_dataset('presencesw/mednli', split='test', trust_remote_code=True)
     test_data=[]
     for doc in ori_test_dataset:
-        query = "Please classify the relationship between the premise and the hypothesis as 'entailment','neutral' or 'contradiction'."+ 'Premise: '+doc['premise']+' Hypothesis:'+doc['hypothesis']+ ' ' #preprocess(doc["activity_label"] + ": " + ctx)
-        #choices = [str(chr(id+ord('A')))+': '+option for id,option in enumerate(doc['options'])] #[preprocess(ending) for ending in doc["endings"]]
-        #query+=' '.join(choices)
+        query = "Please classify the relationship between the premise and the hypothesis as 'entailment','neutral' or 'contradiction'."+ 'Premise: '+doc['sentence1']+' Hypothesis:'+doc['sentence2']+ ' ' #preprocess(doc["activity_label"] + ": " + ctx)
         gold = doc['gold_label']
         new_data={'input':query,'output':gold}
         test_data.append(new_data)
