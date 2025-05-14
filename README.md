@@ -1,11 +1,11 @@
-# 🚀 Data-Synthesis-RL: Efficient Few-Shot RL Fine-Tuning with Synthetic Data Generation
+# 🚀 Synthetic Data RL: One Task Definition Is All You Need
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
 
 ## 💡 Introduction
 
-![System Overview](img/final-one.png)
+![System Overview](img/Overviewv2.png)
 
 This project implements an efficient approach for fine-tuning a base language model ($\mathcal{M}_{base}$) when only task instructions and a few demonstration examples $\mathcal{D}$ (optional) are available. It leverages a powerful teacher large language model ($\mathcal{T}$), external knowledge retrieval, and strategic synthetic data generation to create an effective training dataset. The base model is then trained on the most informative subset of this synthetic data using reinforcement learning.
 
@@ -144,7 +144,7 @@ If you find our work helpful, please consider citing:
 
 ```bibtex
 @misc{data-synthesis-rl,
-  title={Data-Synthesis-RL: Efficient Few-Shot RL Fine-Tuning with Synthetic Data Generation},
+  title={Synthetic Data RL: One Task Definition Is All You Need},
   author={},
   howpublished={\url{https://github.com/your-username/Data_Synthesis_RL}},
   year={2024}
