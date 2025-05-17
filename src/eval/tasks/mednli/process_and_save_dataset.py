@@ -3,6 +3,7 @@ import datasets
 import pdb
 
 from eval.tasks.mednli.process_prediction import process_prediction
+from eval.tasks.mednli.process_label import process_label
 from eval.tasks.mednli.get_output_instruction import get_output_instruction
 import os
 
@@ -21,13 +22,25 @@ def process_and_save_dataset(train_data, data_source,local_dir):
                Returns (train_dataset_path, test_dataset_path).
     """
     
- 
+    new_train_data=[]
+    for data in train_data:
+        new_data={}
+        for key in data:
+            try:
+                new_data[key]=str(data[key])
+            except:
+                pdb.set_trace()
+        new_train_data.append(new_data)
+    train_data=new_train_data
     train_dataset=Dataset.from_list(train_data)
     ori_test_dataset = datasets.load_dataset('presencesw/mednli', split='test', trust_remote_code=True)
     test_data=[]
     for doc in ori_test_dataset:
         query = "Please classify the relationship between the premise and the hypothesis as 'entailment','neutral' or 'contradiction'."+ 'Premise: '+doc['sentence1']+' Hypothesis:'+doc['sentence2']+ ' ' #preprocess(doc["activity_label"] + ": " + ctx)
+        #choices = [str(chr(id+ord('A')))+': '+option for id,option in enumerate(doc['options'])] #[preprocess(ending) for ending in doc["endings"]]
+        #query+=' '.join(choices)
         gold = doc['gold_label']
+      
         new_data={'input':query,'output':gold}
         test_data.append(new_data)
     test_dataset=Dataset.from_list(test_data)
@@ -39,10 +52,10 @@ def process_and_save_dataset(train_data, data_source,local_dir):
             question = question_raw + ' ' + instruction_following
             try:
                 answer_raw = example.pop('output')
-                if split=='train':
+                if split=='test':
+                    solution=process_label(answer_raw)
+                else:    #pdb.set_trace()
                     solution = process_prediction(answer_raw)
-                else:
-                    solution=answer_raw
 
                 data = {
                     "data_source": data_source,
