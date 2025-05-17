@@ -579,18 +579,7 @@ def update_demo_examples(inference_result,demo_examples: List[Dict[str, str]]) -
             demo_examples.append(data[1])
     return demo_examples
 
-    # Inputs:
-    #   hard_data: List[Dict[str, str]] - List of hard GSM8K problems.
-    #   demo_examples: List[Dict[str, str]] - List of current demo examples.
-    #   update_strategy: Literal['True_same', 'False', 'True_increase'] - Strategy for updating demo examples.
-    # Outputs:
-    #   List[Dict[str, str]] - Updated demo examples.
-    # Key Parameters:
-    #   update_strategy:  Determines how demo examples are updated (or not updated) based on hard data.
-
-
-
-def iterative_training_framework(base_model_path,task_name,task_instruction,demo_examples,dataset_path,work_model_paths,passage_paths,iterations: int = 5,domain=None,multi_task=False) -> WorkingModel:
+def iterative_training_framework(base_model_path,task_name,task_instruction,demo_examples,dataset_path,work_model_paths,passage_paths,iterations: int = 1,domain=None,multi_task=False) -> WorkingModel:
     """
     Iterative training framework for a task.
     """
@@ -609,9 +598,6 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
             cur_path=os.getcwd()
             #train_rl_data=torch.load(os.path.join(cur_path,'src','train_data_{0}_{1}.pt'.format(task_name,iter_num)))
             Buffer=torch.load(os.path.join(cur_path,'src','buffer_{0}_{1}.pt'.format(task_name,iter_num)))
-            #train_sft_data=torch.load(os.path.join(cur_path,'src','train_sft_data_{0}_{1}.pt'.format(task_name,iter_num)))
-            #sft_model_path='./sft_{0}_model'.format(task_name)
-            #SFT_data_path=torch.load(os.path.join(cur_path,'src','train_sft_path_{0}_{1}.pt'.format(task_name,iter_num)))
         except:
          # 1. Initial Data Generation (GSM8K)       
             initial_data = data_generator.generate_initial_data(demo_examples,task_name,task_instruction,iter_num,multi_task,passage_paths)
@@ -642,7 +628,7 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
             cur_path=os.getcwd()
             torch.save(Buffer,os.path.join(cur_path,'src','buffer_{0}_{1}.pt'.format(task_name,iter_num)))
         Model_Trainer.model_path=base_model_path
-        sft_model_path='sft-{0}-model'.format(task_name)
+        #sft_model_path='sft-{0}-model'.format(task_name)
             
         try:
             import os
@@ -669,10 +655,6 @@ def iterative_training_framework(base_model_path,task_name,task_instruction,demo
         new_model_path=Model_Trainer.test_run()
         if new_model_path:
             working_model_path=new_model_path
-        pdb.set_trace()
-        
-
-    print("\n--- GSM8K Training Complete ---")
     return working_model_path
 
 
@@ -691,8 +673,8 @@ if __name__ == "__main__":
                         help='Path to the dataset')
     parser.add_argument('--work_model_paths', action='append', required=True,
                         help='Paths for work models (can be provided multiple times)')
-    parser.add_argument('--iterations', type=int, default=5,
-                        help='Number of iterations (default: 5)')
+    parser.add_argument('--iterations', type=int, default=1,
+                        help='Number of iterations (default: 1)')
     parser.add_argument('--passage_paths', type=List, default=['./src/retriever/passages/wiki','./src/retriever/passages/wikihow','./src/retriever/passages/stackexchange'],
                         help='Paths for retrieval passages (can be provided mannually)')
     parser.add_argument('--domain', nargs="+", default=None,
