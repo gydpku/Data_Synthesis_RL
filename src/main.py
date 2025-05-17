@@ -139,17 +139,17 @@ class TaskBuffer:
     def check_label(self,Tasker):
         new_buffer=[]
         for data in self.learnable_buffer:
-          if Tasker.process_label(data['output']):
+          if Tasker.process_prediction(data['output']):
               new_buffer.append(data)
         self.learnable_buffer=new_buffer
         new_buffer=[]
         for data in self.unsolved_buffer:
-          if Tasker.process_label(data['output']):
+          if Tasker.process_prediction(data['output']):
               new_buffer.append(data)
         self.unsolved_buffer=new_buffer
         new_buffer=[]
         for data in self.solved_buffer:
-          if Tasker.process_label(data['output']):
+          if Tasker.process_prediction(data['output']):
               new_buffer.append(data)
         self.solved_buffer=new_buffer
 
@@ -541,7 +541,7 @@ class WorkingModel:
             
             for input, pred, truth in zip(batch_inputs, batch_response, batch_labels):
                 #pred = tasker.process_prediction(pred)
-                label = tasker.process_label(truth)
+                label = tasker.process_prediction(truth)
                 
                 eval_result = tasker.eval_function(pred, label)
                 # Append the evaluation result with input/output info to the results list
