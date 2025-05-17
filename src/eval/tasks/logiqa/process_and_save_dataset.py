@@ -1,8 +1,9 @@
 from datasets import Dataset
 import datasets
 import pdb
-
+import random
 from eval.tasks.logiqa.process_prediction import process_prediction
+from eval.tasks.logiqa.process_label import process_label
 from eval.tasks.logiqa.get_output_instruction import get_output_instruction
 import os
 
@@ -21,8 +22,20 @@ def process_and_save_dataset(train_data, data_source,local_dir):
                Returns (train_dataset_path, test_dataset_path).
     """
     
- 
-    train_dataset=Dataset.from_list(train_data)
+    #pdb.set_trace()
+    new_train_data=[]
+    for data in train_data:
+        new_data={}
+        for key in data:
+            try:
+                new_data[key]=str(data[key])
+            except:
+                pdb.set_trace()
+        new_train_data.append(new_data)
+    train_data=new_train_data
+    random.shuffle(train_data)
+    train_dataset=Dataset.from_list(train_data)#[:500])
+    #train_dataset=Dataset.from_list(train_data)
     ori_test_dataset = datasets.load_dataset('lucasmccabe/logiqa', split='test', trust_remote_code=True)
     test_data=[]
     for doc in ori_test_dataset:
@@ -41,10 +54,13 @@ def process_and_save_dataset(train_data, data_source,local_dir):
             question = question_raw + ' ' + instruction_following
             try:
                 answer_raw = example.pop('output')
+                
                 if split=='train':
                     solution = process_prediction(answer_raw)
                 else:
-                    solution=answer_raw
+                    solution = process_label(answer_raw)
+               
+                #solution = answer_raw
 
                 data = {
                     "data_source": data_source,
