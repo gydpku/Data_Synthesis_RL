@@ -21,7 +21,16 @@ def process_and_save_dataset(train_data, data_source,local_dir,is_instruct=False
                Returns (train_dataset_path, test_dataset_path).
     """
     
- 
+    new_train_data=[]
+    for data in train_data:
+        new_data={}
+        for key in data:
+            try:
+                new_data[key]=str(data[key])
+            except:
+                pdb.set_trace()
+        new_train_data.append(new_data)
+    train_data=new_train_data
     train_dataset=Dataset.from_list(train_data)
     ori_test_dataset = datasets.load_dataset('xDAN2099/lighteval-MATH', split='test', trust_remote_code=True)
     test_data=[]
