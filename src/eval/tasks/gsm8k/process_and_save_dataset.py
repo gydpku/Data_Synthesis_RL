@@ -3,6 +3,7 @@ import datasets
 from eval.tasks.gsm8k.process_prediction import process_prediction
 from eval.tasks.gsm8k.get_output_instruction import get_output_instruction
 import os
+import random
 
 def process_and_save_dataset(train_data, data_source, local_dir):
     """
@@ -18,12 +19,30 @@ def process_and_save_dataset(train_data, data_source, local_dir):
         tuple: A tuple containing the paths to the saved train and test parquet datasets.
                Returns (train_dataset_path, test_dataset_path).
     """
-    
- 
+    '''
+    ori_train_dataset = datasets.load_dataset('openai/gsm8k', 'main')['train']
+    train_data=[]
+    for data in ori_train_dataset:
+        new_data={'input':data['question'],'output':data['answer']}
+        train_data.append(new_data)
+    random.shuffle(train_data)
+    train_dataset=Dataset.from_list(train_data[:500])
+    '''
+    new_train_data=[]
+    for data in train_data:
+        new_data={}
+        for key in data:
+            try:
+                new_data[key]=str(data[key])
+            except:
+                pdb.set_trace()
+        new_train_data.append(new_data)
+    train_data=new_train_data
     train_dataset=Dataset.from_list(train_data)
     ori_test_dataset = datasets.load_dataset('openai/gsm8k', 'main')['test']
     test_data=[]
     for data in ori_test_dataset:
+        #data=eval(data)
         new_data={'input':data['question'],'output':data['answer']}
         test_data.append(new_data)
     test_dataset=Dataset.from_list(test_data)
