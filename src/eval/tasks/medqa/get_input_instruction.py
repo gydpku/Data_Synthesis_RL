@@ -1,0 +1,2 @@
+def get_input_instruction():
+    return "First a clinical vignettes or diagrams. A clinical vignette is a short, descriptive medical case that simulates a real-life scenario involving a patient. It includes details like: Patient demographics (age, sex, etc.),Medical history,Symptoms and signs,Lab or imaging results,Progression or complication. Then a USMLE-style multiple-choice question with its four options. "

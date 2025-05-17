@@ -1,0 +1,2 @@
+def get_input_instruction():
+    return "Each data instance typically consists of a scientific question and 4 option labels and values are the corresponding answer texts." #"Your input should consists of a context passage like 'Context:...' and then a logic question like 'Question:...' and then ABCD four different options"
