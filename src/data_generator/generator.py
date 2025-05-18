@@ -57,7 +57,7 @@ def label_transform(label: int ) -> str:
         return 'entailment'
     if label==2:
         return 'contradiction'
-def aug_few_shot_prompt_pattern_generate(high_quality_examples: List[Dict], task_instruction: str, obj_passage: List[str],output_instruction:str,input_instruction:str) -> str:   
+def aug_few_shot_prompt_pattern_generate(high_quality_examples: List[Dict], task_instruction: str, obj_passage: List[str],output_instruction:str,input_instruction:str,pattern:str) -> str:   
     template=META_PROMPT
     #knowledge_prompt=f'extract and list the domain knowledge from the passage {obj_passage[:min(2048,len(obj_passage))]} that is related to the task instruction {task_instruction}. You should only output the knowledge without any other text. The knowledge is:'
     template+='You must consider the task instruction (task knowledge), and the passage (domain knowledge) to generate your training data.'
@@ -66,10 +66,8 @@ def aug_few_shot_prompt_pattern_generate(high_quality_examples: List[Dict], task
         template+=""" Here is the input instruction:{0}\n. You should follow the input format in the instruction strictly to generate data!!!""".format(input_instruction)
     
     template+=""" Here is the output instruction:{0}\n. You should follow the output format in the instruction strictly to generate data!!!""".format(output_instruction)
-    #template+=f"""Here is the sample pattern {pattern}. You should follow the input and output pattern strictly to generate data!!!""" 
-    #pdb.set_trace()
-    #template+=""" Here is the input instruction:{0}\n. You should follow the input format in the instruction strictly to generate data!!!""".format(input_instruction)
     if high_quality_examples:
+        template+=f"""Here is the sample pattern {pattern}"""
         template+=""" You can refer to the provided examples. """ 
 
         for id in range(len(high_quality_examples)):
@@ -97,8 +95,7 @@ def cot_check_fill(demo_examples: List[Dict], task_name: str = '') -> List[Dict]
             demo_cot_examples.append({'Input':example['Input'],'Output':cot_solution})
 
         return demo_cot_examples
-def data_sample_pattern(instruction: str, domain: str, num: int, store_name: str, demo_examples: List[Dict], paths: List[str], harder: bool=False, simpler: bool=False,temperature: float=0.7, task_name: str='nli', voting: bool=False, pattern: bool=False, iteration_number: int=1, sample_demo_num: int=3, passage_num: int=5000, valid_num: int=100) -> List[Dict]:
-    task_instruction=instruction
+def data_sample_pattern(task_instruction: str, domain: str, num: int, store_name: str, demo_examples: List[Dict], paths: List[str], harder: bool=False, simpler: bool=False,temperature: float=0.7, task_name: str='nli', voting: bool=False, pattern: bool=False, iteration_number: int=1, sample_demo_num: int=3, passage_num: int=5000, valid_num: int=100) -> List[Dict]:
     print('load_cot_data...')
     demo_cot_examples=demo_examples
     
@@ -135,6 +132,20 @@ def data_sample_pattern(instruction: str, domain: str, num: int, store_name: str
         task_evaluator.load_task(task_name)
         output_instruction=task_evaluator.get_output_instruction()
         input_instruction=task_evaluator.get_input_instruction()
+        if demo_cot_examples:
+            part_demo_cot_examples=demo_cot_examples[:50]
+            pattern_prompt = f"""Given you the provided task instruction, input/output format instructions, and demonstration examples: 
+            Task Instruction: {task_instruction}
+            Input Format Instruction: {input_instruction}
+            Output Format Instruction: {output_instruction}
+            Demonstration Examples: {part_demo_cot_examples}
+            Our sample consists of the input and output part.
+            Your output should be a general summary of the task sample pattern.
+            In your pattern, new and undiscovered general sample format information are preferred.
+            Don't mention any specific and particular sample in your summary."""
+            pattern=query_azure_openai_chatgpt_chat(pattern_prompt)
+        else:
+            pattern=None
         for num_id in range(start,num+3-len(examples_str)):
             
             sample_size = 1 # random.randint(1,5)
@@ -147,7 +158,7 @@ def data_sample_pattern(instruction: str, domain: str, num: int, store_name: str
             completed=False
             while completed is False:
                 try:
-                    examples_str.append(aug_few_shot_prompt_pattern_generate(sampled_demo_examples,task_instruction,sampled_objects,output_instruction,input_instruction))
+                    examples_str.append(aug_few_shot_prompt_pattern_generate(sampled_demo_examples,task_instruction,sampled_objects,output_instruction,input_instruction,pattern))
                     completed=True
                 except:
                     import time
