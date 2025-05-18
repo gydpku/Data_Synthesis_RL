@@ -17,7 +17,7 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 
 from verl import DataProto
 import torch
-from verl.utils.reward_score import gsm8k, math,mednli, multiply, countdown,logiqa,dentist_qa
+from verl.utils.reward_score import cfa,cqa,medqa,gpqa,gsm8k, math,mednli, multiply, countdown,logiqa,dentist_qa
 from verl.trainer.ppo.ray_trainer import RayPPOTrainer
 
 
@@ -34,6 +34,14 @@ def _select_rm_score_fn(data_source):
         return ast.compute_score
     elif "logiqa" in data_source:
         return logiqa.compute_score
+    elif "gpqa" in data_source:
+        return gpqa.compute_score
+    elif "medqa" in data_source:
+        return medqa.compute_score
+    elif "cqa" in data_source:
+        return cqa.compute_score
+    elif "cfa" in data_source:
+        return cfa.compute_score
     elif "dentist_qa" in data_source:
         return dentist_qa.compute_score
     elif "mednli" in data_source:
