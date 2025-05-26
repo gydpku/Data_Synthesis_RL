@@ -1,4 +1,4 @@
-# 🚀 Synthetic Data RL: One Task Definition Is All You Need
+# 🚀 Synthetic Data RL: Task Definition Is All You Need
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
